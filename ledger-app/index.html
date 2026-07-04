@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — tasks, habits, notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#FFF6FA; --surface:#FFFFFF; --surface-2:#FFEEF6; --border:#FFD6EA; --border-soft:#FFE3F1;
+    --text:#4A3B48; --text-dim:#8B7A88; --text-faint:#C3AFC0;
+    --pink:#FF6FA0; --pink-dim:#FFE0ED; --pink-deep:#E8447E;
+    --blue:#4FC3F7; --blue-dim:#E1F7FF;
+    --green:#3FCB93; --green-dim:#DEFBEF;
+    --amber:#FFB648; --amber-dim:#FFF1DA;
+    --red:#FF6B81; --red-dim:#FFE3E8;
+    --purple:#B18CFF; --purple-dim:#F0E9FF;
+    --shadow: 0 4px 16px rgba(255,111,160,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background: radial-gradient(circle at 8% 0%, var(--purple-dim) 0%, transparent 35%), radial-gradient(circle at 95% 10%, var(--blue-dim) 0%, transparent 32%), var(--bg); color:var(--text); font-family:'Quicksand', sans-serif; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3{ font-family:'Baloo 2', sans-serif; font-weight:700; margin:0; }
+  .app{ max-width:820px; margin:0 auto; padding:20px 16px 60px; position:relative; }
+  .header{ display:flex; align-items:center; justify-content:space-between; padding:14px 18px; margin-bottom:18px; border-radius:20px; background:linear-gradient(135deg, var(--pink-dim), var(--purple-dim)); gap:12px; flex-wrap:wrap; box-shadow:var(--shadow); }
+  .header-title{ font-size:24px; color:var(--pink-deep); }
+  .header-sub{ color:var(--text-dim); font-size:12.5px; margin-top:3px; font-weight:600; }
+  .streak-badge{ display:flex; align-items:center; gap:8px; background:#fff; border:2px solid var(--pink); border-radius:999px; padding:7px 16px 7px 10px; box-shadow:var(--shadow); }
+  .streak-num{ font-size:20px; font-weight:700; color:var(--pink-deep); line-height:1; font-family:'Baloo 2',sans-serif; }
+  .streak-label{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; font-weight:600; }
+  .user-bar{ display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--text-dim); font-weight:700; }
+  .user-bar button{ background:#fff; border:2px solid var(--border); color:var(--pink-deep); padding:6px 12px; border-radius:999px; cursor:pointer; font-weight:700; font-family:'Quicksand',sans-serif; }
+  .tabs{ display:flex; gap:6px; margin-bottom:20px; overflow-x:auto; }
+  .tab{ background:#fff; border:2px solid var(--border); color:var(--text-dim); font-size:14px; font-weight:700; padding:9px 16px; cursor:pointer; white-space:nowrap; border-radius:999px; }
+  .tab.active{ color:#fff; background:linear-gradient(135deg, var(--pink), var(--pink-deep)); border-color:transparent; box-shadow:var(--shadow); }
+  .card{ background:#fff; border:2px solid var(--border-soft); border-radius:18px; padding:16px; margin-bottom:14px; box-shadow:0 2px 10px rgba(255,111,160,0.06); }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input[type=text], input[type=date], input[type=time], input[type=email], input[type=password], textarea, select{ background:var(--surface-2); border:2px solid var(--border); color:var(--text); font-family:'Quicksand',sans-serif; font-weight:600; font-size:14px; padding:9px 12px; border-radius:12px; outline:none; }
+  input:focus, textarea:focus, select:focus{ border-color:var(--pink); }
+  textarea{ resize:vertical; min-height:70px; width:100%; }
+  button.btn{ background:linear-gradient(135deg, var(--pink), var(--pink-deep)); color:#fff; border:none; font-weight:700; font-size:14px; padding:10px 18px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow); }
+  button.icon-btn{ background:none; border:none; color:var(--text-faint); cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center; }
+  button.icon-btn:hover{ color:var(--red); }
+  .empty{ color:var(--text-faint); font-size:13.5px; text-align:center; padding:30px 10px; font-weight:600; }
+  .day-chip{ background:var(--surface-2); border:2px solid var(--border); color:var(--text-dim); font-size:11.5px; padding:6px 9px; border-radius:10px; cursor:pointer; font-weight:700; }
+  .day-chip.on{ background:linear-gradient(135deg, var(--purple), var(--pink)); border-color:transparent; color:#fff; }
+  .filter-row{ display:flex; gap:6px; margin-bottom:12px; }
+  .filter-chip{ background:#fff; border:2px solid var(--border-soft); color:var(--text-dim); font-size:12.5px; font-weight:700; padding:5px 14px; border-radius:20px; cursor:pointer; }
+  .filter-chip.active{ background:var(--pink-dim); color:var(--pink-deep); border-color:var(--pink); }
+  .task-item{ display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:2px dashed var(--border-soft); }
+  .checkbox{ width:22px; height:22px; border-radius:8px; border:2px solid var(--text-faint); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:#fff; }
+  .checkbox.checked{ background:linear-gradient(135deg, var(--green), #2fb37f); border-color:transparent; }
+  .task-title{ font-size:14.5px; font-weight:600; }
+  .task-title.done{ text-decoration:line-through; color:var(--text-faint); }
+  .task-meta{ display:flex; gap:8px; margin-top:4px; align-items:center; flex-wrap:wrap; }
+  .priority-dot{ width:8px; height:8px; border-radius:50%; }
+  .due-label{ font-size:11.5px; color:var(--text-faint); font-weight:700; }
+  .due-label.overdue{ color:var(--red); } .due-label.today{ color:var(--pink-deep); }
+  .week-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .week-nav-label{ font-size:13px; color:var(--text-dim); font-family:'Baloo 2',sans-serif; font-weight:600; }
+  .week-nav button{ background:var(--surface-2); border:2px solid var(--border); color:var(--pink-deep); padding:6px 12px; border-radius:999px; cursor:pointer; font-weight:700; }
+  .table-scroll{ overflow-x:auto; }
+  table.timetable{ border-collapse:collapse; width:100%; min-width:680px; }
+  table.timetable th, table.timetable td{ padding:8px 6px; text-align:center; border-bottom:2px dashed var(--border-soft); }
+  table.timetable th{ font-size:11px; color:var(--pink-deep); font-weight:700; text-transform:uppercase; }
+  table.timetable td.habit-col{ text-align:left; min-width:140px; }
+  .habit-cell-name{ font-size:13.5px; font-weight:700; }
+  .habit-cell-streak{ font-size:10px; color:var(--text-faint); margin-top:2px; font-weight:700; }
+  .tag-pill{ display:inline-block; font-size:9px; font-weight:800; padding:1px 7px; border-radius:999px; margin-top:3px; text-transform:uppercase; }
+  .tag-pill.habit{ background:var(--green-dim); color:#1e8a63; } .tag-pill.task{ background:var(--purple-dim); color:#7248d6; }
+  .time-text{ font-size:12px; color:var(--text-dim); font-weight:700; font-family:'Baloo 2',sans-serif; }
+  .tt-checkbox{ width:22px; height:22px; border-radius:8px; border:2px solid var(--text-faint); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; background:var(--surface-2); }
+  .tt-checkbox.checked{ background:linear-gradient(135deg, var(--green), #2fb37f); border-color:transparent; }
+  .tt-checkbox.today{ box-shadow:0 0 0 3px var(--pink-dim); }
+  .tt-dash{ color:var(--text-faint); font-size:13px; }
+  .event-item{ display:flex; align-items:center; gap:12px; padding:11px 4px; border-bottom:2px dashed var(--border-soft); }
+  .event-item.past{ opacity:0.45; }
+  .event-datebox{ background:var(--blue-dim); border:2px solid var(--blue); border-radius:12px; padding:6px 10px; text-align:center; min-width:52px; }
+  .event-datebox .d{ font-size:16px; font-weight:800; font-family:'Baloo 2',sans-serif; color:#1a8fc2; }
+  .event-datebox .m{ font-size:9.5px; color:var(--text-dim); text-transform:uppercase; font-weight:700; }
+  .event-title{ font-size:14px; font-weight:700; } .event-time{ font-size:11.5px; color:var(--text-faint); font-weight:600; }
+  .bell-toggle{ background:#fff; border:2px solid var(--border); color:var(--text-faint); cursor:pointer; width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  .bell-toggle.on{ color:var(--amber); border-color:var(--amber); background:var(--amber-dim); }
+  .diary-entry{ background:#fff; border:2px solid var(--border-soft); border-radius:16px; padding:14px 16px; margin-bottom:10px; }
+  .diary-date{ font-size:11px; color:var(--pink-deep); font-weight:800; }
+  .diary-title{ font-size:15px; font-weight:700; margin-top:4px; }
+  .diary-text{ font-size:13.5px; color:var(--text-dim); margin-top:6px; line-height:1.55; white-space:pre-wrap; }
+  .stat-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px; }
+  .stat-box{ background:#fff; border:2px solid var(--border-soft); border-radius:16px; padding:14px 16px; }
+  .stat-num{ font-size:28px; font-weight:800; font-family:'Baloo 2',sans-serif; color:var(--pink-deep); }
+  .stat-num.green{ color:#1e8a63; }
+  .stat-label{ font-size:11.5px; color:var(--text-faint); font-weight:700; }
+  .bar-wrap{ background:var(--surface-2); border-radius:8px; height:9px; margin-top:8px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:8px; }
+  .section-label{ font-size:13px; color:var(--pink-deep); text-transform:uppercase; margin:18px 0 10px; font-weight:800; }
+  .week-chart{ display:flex; align-items:flex-end; gap:8px; height:100px; margin-top:8px; }
+  .week-bar-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .week-bar{ width:100%; background:linear-gradient(180deg, var(--pink), var(--purple)); border-radius:8px 8px 3px 3px; }
+  .week-bar-label{ font-size:9.5px; color:var(--text-faint); font-weight:700; }
+  .big-heatmap{ display:flex; gap:3px; overflow-x:auto; margin-top:8px; }
+  .heat-col{ display:flex; flex-direction:column; gap:3px; }
+  .heat-cell{ width:11px; height:11px; border-radius:3px; background:var(--surface-2); border:1px solid var(--border-soft); }
+  .heat-cell[data-lvl="1"]{ background:#B9F0DA; border-color:#B9F0DA; }
+  .heat-cell[data-lvl="2"]{ background:#6FE0B2; border-color:#6FE0B2; }
+  .heat-cell[data-lvl="3"]{ background:var(--green); border-color:var(--green); }
+  .hint{ font-size:12px; color:var(--text-faint); font-weight:600; margin:-4px 0 12px; }
+  #celebrate-zone{ position:relative; height:0; }
+  .celebrate-toast{ position:absolute; top:6px; left:50%; transform:translateX(-50%); background:#fff; border:2px solid var(--pink); border-radius:18px; padding:12px 22px; box-shadow:0 8px 24px rgba(232,68,126,0.28); font-family:'Baloo 2', sans-serif; font-weight:700; font-size:15px; color:var(--pink-deep); white-space:nowrap; z-index:20; }
+  .reminder-banner{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--blue-dim); border:2px solid var(--blue); padding:11px 14px; border-radius:14px; margin-bottom:14px; font-size:13.5px; font-weight:600; }
+  .reminder-banner button{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; }
+
+  /* AUTH SCREEN */
+  #auth-screen{ max-width:380px; margin:60px auto; }
+  #auth-screen .card{ padding:26px; }
+  #auth-screen h2{ font-size:22px; color:var(--pink-deep); margin-bottom:4px; }
+  #auth-screen p.sub{ color:var(--text-dim); font-size:13px; margin-bottom:18px; font-weight:600; }
+  #auth-screen input{ width:100%; margin-bottom:10px; }
+  #auth-screen .btn{ width:100%; margin-top:6px; }
+  #auth-error{ color:var(--red); font-size:12.5px; font-weight:700; margin-top:8px; min-height:16px; }
+  #auth-toggle{ text-align:center; margin-top:14px; font-size:13px; color:var(--text-dim); font-weight:600; }
+  #auth-toggle a{ color:var(--pink-deep); cursor:pointer; font-weight:800; }
+  #setup-warning{ max-width:520px; margin:60px auto; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div id="setup-warning" style="display:none;">
+    <div class="card">
+      <h2>⚙️ One-time setup needed</h2>
+      <p style="font-weight:600; color:var(--text-dim); margin-top:10px;">
+        This file needs your Supabase project URL and anon key filled in near the top of the &lt;script&gt; section
+        (look for <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>) before it will work.
+      </p>
+    </div>
+  </div>
+
+  <div id="auth-screen" style="display:none;">
+    <div class="card">
+      <h2 id="auth-title">Welcome back 🌸</h2>
+      <p class="sub" id="auth-sub">Log in to your Ledger</p>
+      <input type="email" id="auth-email" placeholder="Email">
+      <input type="password" id="auth-password" placeholder="Password">
+      <button class="btn" id="auth-submit">Log in</button>
+      <div id="auth-error"></div>
+      <div id="auth-toggle">New here? <a id="auth-switch">Create an account</a></div>
+    </div>
+  </div>
+
+  <div id="main-content" style="display:none;">
+    <div class="header">
+      <div>
+        <h1 class="header-title">🌸 Ledger</h1>
+        <div class="header-sub">your discipline, tracked daily</div>
+      </div>
+      <div class="streak-badge">
+        <svg id="flame-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6FA0" stroke-width="1.8"><path d="M12 2c1 3-2 4-2 7a4 4 0 1 0 8 0c0-1-.5-2-1-2 .3 2-.7 3-2 3-1.8 0-2.5-1.7-1.5-3.5C14.5 4.5 13 3 12 2Z" stroke-linejoin="round"/></svg>
+        <div><div class="streak-num" id="streak-count">0</div><div class="streak-label">day streak</div></div>
+      </div>
+    </div>
+    <div class="user-bar" style="margin:-10px 0 16px; justify-content:flex-end;">
+      <span id="user-email"></span>
+      <button id="signout-btn">Sign out</button>
+    </div>
+
+    <div id="banner-zone"></div>
+    <div id="celebrate-zone"></div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="tasks">📝 Tasks</button>
+      <button class="tab" data-tab="habits">📅 Schedule</button>
+      <button class="tab" data-tab="diary">📔 Diary</button>
+      <button class="tab" data-tab="insights">💫 Insights</button>
+    </div>
+    <div id="tab-content"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+// ====================== FILL THESE IN FROM YOUR SUPABASE PROJECT ======================
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+// =======================================================================================
+
+let supabaseClient = null;
+let currentUser = null;
+
+const S = { tasks: [], habits: [], diary: [], events: [], tab: 'tasks', ready: false, weekOffset: 0, taskFilter:'active', celebratedMilestones: new Set() };
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MILESTONES = [3,7,14,21,30,50,75,100,150,200];
+const TASK_MSGS = ['Task crushed! You are amazing!', 'One more done, keep glowing!', 'Yay! Nice work, superstar!', 'Boom! Task complete!', 'Look at you go!'];
+const HABIT_MSGS = ['+1 day logged!', 'Nice streak building!', 'Habit checked, love that!', 'Consistency looks good on you!'];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function fmtDate(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+day; }
+function todayStr(){ return fmtDate(new Date()); }
+function addDays(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d; }
+function daysBetween(a,b){ const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00'); return Math.round((d2-d1)/86400000); }
+function getMonday(date){ const d=new Date(date); const day=d.getDay(); const diff = day===0?-6:1-day; d.setDate(d.getDate()+diff); return d; }
+function getWeekDates(offset){ const monday = getMonday(new Date()); monday.setDate(monday.getDate() + offset*7); const arr=[]; for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(d.getDate()+i); arr.push(fmtDate(d)); } return arr; }
+function fmtShort(dateStr){ const d = new Date(dateStr+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// ---------- DB <-> local field mapping ----------
+function taskFromDb(r){ return { id:r.id, title:r.title, priority:r.priority, time:r.time||'', dueDate:r.due_date, done:r.done, createdAt:r.created_at, completedAt:r.completed_at }; }
+function habitFromDb(r){ return { id:r.id, name:r.name, time:r.time||'', days:r.days, createdAt:r.created_at, log:r.log||{} }; }
+function diaryFromDb(r){ return { id:r.id, date:r.date, title:r.title, text:r.body, createdAt:r.created_at }; }
+function eventFromDb(r){ return { id:r.id, title:r.title, date:r.date, time:r.time||'', remind:r.remind, notified:r.notified, createdAt:r.created_at }; }
+
+// ---------- AUTH ----------
+let authMode = 'login';
+function showSetupWarningIfNeeded(){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY'){
+    document.getElementById('setup-warning').style.display = 'block';
+    return true;
+  }
+  return false;
+}
+function renderAuthGate(){
+  document.getElementById('auth-screen').style.display = currentUser ? 'none' : 'block';
+  document.getElementById('main-content').style.display = currentUser ? 'block' : 'none';
+  if(currentUser){
+    document.getElementById('user-email').textContent = currentUser.email || '';
+    loadAll().then(render);
+  }
+}
+async function initAuth(){
+  if(showSetupWarningIfNeeded()) return;
+  try{
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data:{ session } } = await supabaseClient.auth.getSession();
+    currentUser = session ? session.user : null;
+    supabaseClient.auth.onAuthStateChange((_event, session)=>{ currentUser = session ? session.user : null; renderAuthGate(); });
+    renderAuthGate();
+  }catch(err){
+    console.error('Supabase init failed:', err);
+    document.getElementById('setup-warning').style.display = 'block';
+  }
+}
+function toggleAuthMode(){
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('auth-title').textContent = authMode==='login' ? 'Welcome back 🌸' : 'Create your account 🌱';
+  document.getElementById('auth-sub').textContent = authMode==='login' ? 'Log in to your Ledger' : 'Start tracking with Ledger';
+  document.getElementById('auth-submit').textContent = authMode==='login' ? 'Log in' : 'Sign up';
+  document.getElementById('auth-toggle').innerHTML = authMode==='login' ? 'New here? <a id="auth-switch">Create an account</a>' : 'Already have an account? <a id="auth-switch">Log in</a>';
+  document.getElementById('auth-switch').onclick = toggleAuthMode;
+  document.getElementById('auth-error').textContent = '';
+}
+document.getElementById('auth-switch').onclick = toggleAuthMode;
+document.getElementById('auth-submit').onclick = async ()=>{
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent = 'Please fill in both fields.'; return; }
+  try{
+    if(authMode==='login'){
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    } else {
+      const { error } = await supabaseClient.auth.signUp({ email, password });
+      if(error) throw error;
+      errEl.style.color = 'var(--green)';
+      errEl.textContent = 'Account created! Check your email to confirm, then log in.';
+    }
+  }catch(e){ errEl.style.color = 'var(--red)'; errEl.textContent = e.message || 'Something went wrong.'; }
+};
+document.getElementById('signout-btn').onclick = async ()=>{ await supabaseClient.auth.signOut(); };
+
+// ---------- LOAD / SAVE ----------
+async function loadAll(){
+  const [t,h,d,e] = await Promise.all([
+    supabaseClient.from('tasks').select('*').order('created_at'),
+    supabaseClient.from('habits').select('*').order('created_at'),
+    supabaseClient.from('diary_entries').select('*').order('date',{ascending:false}),
+    supabaseClient.from('events').select('*').order('date')
+  ]);
+  S.tasks = (t.data||[]).map(taskFromDb);
+  S.habits = (h.data||[]).map(habitFromDb);
+  S.diary = (d.data||[]).map(diaryFromDb);
+  S.events = (e.data||[]).map(eventFromDb);
+  if(S.tasks.length===0 && S.habits.length===0 && S.diary.length===0){
+    await seedDefaults();
+  }
+  S.ready = true;
+}
+async function seedDefaults(){
+  const ALL = [true,true,true,true,true,true,true];
+  const WEEKDAYS = [true,true,true,true,true,false,false];
+  const seedHabits = [
+    { name:'College (8am–5pm)', time:'08:00', days:WEEKDAYS, log:{} },
+    { name:'Exercise', time:'06:00', days:ALL, log:{} },
+    { name:'Homework', time:'17:30', days:WEEKDAYS, log:{} },
+    { name:'MPSC study', time:'19:00', days:ALL, log:{} },
+    { name:'Extra self-study', time:'20:30', days:ALL, log:{} },
+    { name:'Read a book', time:'21:15', days:ALL, log:{} },
+    { name:'Call family', time:'21:45', days:ALL, log:{} },
+    { name:'Check on friends', time:'22:00', days:ALL, log:{} },
+    { name:'Night prep for tomorrow', time:'22:30', days:ALL, log:{} }
+  ];
+  const { data: hRows } = await supabaseClient.from('habits').insert(seedHabits).select();
+  S.habits = (hRows||[]).map(habitFromDb);
+  const { data: tRows } = await supabaseClient.from('tasks').insert([{ title:'Try editing or deleting this sample task!', priority:'medium', due_date: fmtDate(addDays(todayStr(),5)) }]).select();
+  S.tasks = (tRows||[]).map(taskFromDb);
+}
+
+// ---------- ANALYTICS HELPERS ----------
+function getActiveDatesSet(){
+  const set = new Set();
+  S.habits.forEach(h => Object.keys(h.log||{}).forEach(d => { if(h.log[d]) set.add(d); }));
+  S.diary.forEach(e => set.add(e.date));
+  S.tasks.forEach(t => { if(t.done && t.completedAt) set.add(t.completedAt.slice(0,10)); });
+  return set;
+}
+function calcEngagementStreak(){
+  const dates = getActiveDatesSet(); let cursor = new Date(); let ds = fmtDate(cursor); let streak = 0;
+  if(!dates.has(ds)){ cursor.setDate(cursor.getDate()-1); }
+  while(dates.has(fmtDate(cursor))){ streak++; cursor.setDate(cursor.getDate()-1); }
+  return streak;
+}
+function calcBestStreak(){
+  const dates = Array.from(getActiveDatesSet()).sort();
+  if(dates.length===0) return 0;
+  let best=1, cur=1;
+  for(let i=1;i<dates.length;i++){ if(daysBetween(dates[i-1], dates[i])===1){ cur++; best=Math.max(best,cur); } else cur=1; }
+  return Math.max(best, cur);
+}
+function calcHabitStreak(log){
+  let cursor = new Date(); let ds = fmtDate(cursor); let streak = 0;
+  if(!log[ds]){ cursor.setDate(cursor.getDate()-1); }
+  while(log[fmtDate(cursor)]){ streak++; cursor.setDate(cursor.getDate()-1); }
+  return streak;
+}
+function habitDays(h){ return Array.isArray(h.days) && h.days.length===7 ? h.days : [true,true,true,true,true,true,true]; }
+function isTaskScheduledOn(t, ds){
+  if(t.done) return false;
+  const startDate = (t.createdAt||'').slice(0,10) || todayStr();
+  if(ds < startDate) return false;
+  if(t.dueDate && ds > t.dueDate) return false;
+  return true;
+}
+
+// ---------- CELEBRATIONS ----------
+function celebrate(message, big){
+  const zone = document.getElementById('celebrate-zone');
+  const toast = document.createElement('div');
+  toast.className = 'celebrate-toast';
+  toast.textContent = message;
+  zone.appendChild(toast);
+  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, big ? 2600 : 1900);
+}
+function checkMilestones(){
+  const streak = calcEngagementStreak();
+  if(MILESTONES.includes(streak) && !S.celebratedMilestones.has(streak)){
+    S.celebratedMilestones.add(streak);
+    celebrate(`🔥 ${streak}-day streak! You're unstoppable!`, true);
+  }
+}
+
+// ---------- RENDER ----------
+function render(){
+  document.getElementById('streak-count').textContent = calcEngagementStreak();
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === S.tab));
+  const c = document.getElementById('tab-content');
+  if(S.tab==='tasks') c.innerHTML = renderTasks();
+  else if(S.tab==='habits') c.innerHTML = renderHabits();
+  else if(S.tab==='diary') c.innerHTML = renderDiary();
+  else c.innerHTML = renderInsights();
+  attachHandlers();
+}
+
+function priorityColor(p){ return p==='high' ? 'var(--red)' : p==='medium' ? 'var(--amber)' : 'var(--green)'; }
+function priorityRank(p){ return p==='high'?0:p==='medium'?1:2; }
+function dueLabel(dateStr){
+  if(!dateStr) return {text:'no date', cls:''};
+  const diff = daysBetween(todayStr(), dateStr);
+  if(diff < 0) return {text:'overdue '+Math.abs(diff)+'d', cls:'overdue'};
+  if(diff === 0) return {text:'due today', cls:'today'};
+  if(diff === 1) return {text:'due tomorrow', cls:''};
+  return {text:'due in '+diff+'d', cls:''};
+}
+function renderTasks(){
+  let list = S.tasks.slice();
+  if(S.taskFilter==='active') list = list.filter(t=>!t.done);
+  if(S.taskFilter==='done') list = list.filter(t=>t.done);
+  list.sort((a,b)=>{ if(a.done!==b.done) return a.done?1:-1; const pr=priorityRank(a.priority)-priorityRank(b.priority); if(pr!==0) return pr; if(!a.dueDate) return 1; if(!b.dueDate) return -1; return a.dueDate.localeCompare(b.dueDate); });
+  const items = list.length ? list.map(t=>{
+    const dl = dueLabel(t.dueDate);
+    return `<div class="task-item">
+      <div class="checkbox ${t.done?'checked':''}" data-toggle-task="${t.id}">${t.done?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+      <div class="task-body">
+        <div class="task-title ${t.done?'done':''}">${escapeHtml(t.title)}</div>
+        <div class="task-meta"><span class="priority-dot" style="background:${priorityColor(t.priority)}"></span><span class="due-label ${t.done?'':dl.cls}">${t.done?'completed 🎀':dl.text}</span>${t.time?`<span class="due-label">· ${t.time}</span>`:''}</div>
+      </div>
+      <button class="icon-btn" data-del-task="${t.id}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+    </div>`;
+  }).join('') : `<div class="empty">No tasks here yet — add one above! 🌷</div>`;
+  return `
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;">
+        <input type="text" id="new-task-title" placeholder="What needs doing? 💕" style="flex:2; min-width:160px;">
+        <select id="new-task-priority"><option value="medium">Medium</option><option value="high">High</option><option value="low">Low</option></select>
+      </div>
+      <div class="row" style="margin-bottom:8px;"><input type="date" id="new-task-due"><input type="time" id="new-task-time" style="width:110px;"></div>
+      <div class="hint">Tasks with a due date show up on your Schedule every day until they're done ✨</div>
+      <button class="btn" id="add-task-btn">Add task</button>
+    </div>
+    <div class="filter-row">
+      <button class="filter-chip ${S.taskFilter==='active'?'active':''}" data-filter="active">Active</button>
+      <button class="filter-chip ${S.taskFilter==='done'?'active':''}" data-filter="done">Done</button>
+      <button class="filter-chip ${S.taskFilter==='all'?'active':''}" data-filter="all">All</button>
+    </div>
+    <div class="card" style="padding:4px 12px;">${items}</div>`;
+}
+
+function renderHabits(){
+  const weekDates = getWeekDates(S.weekOffset);
+  const monday = weekDates[0], sunday = weekDates[6], today = todayStr();
+  const habitRows = S.habits.map(h => ({ type:'habit', obj:h, sortTime: h.time || '99:99' }));
+  const activeTasks = S.tasks.filter(t => !t.done && (t.createdAt||'').slice(0,10) <= sunday && (!t.dueDate || t.dueDate >= monday));
+  const taskRows = activeTasks.map(t => ({ type:'task', obj:t, sortTime: t.time || '99:99' }));
+  const combined = habitRows.concat(taskRows).sort((a,b)=> a.sortTime.localeCompare(b.sortTime));
+  const headerCells = weekDates.map((ds,i)=>`<th>${DAY_LABELS[i]}<br><span style="color:${ds===today?'var(--pink-deep)':'var(--text-faint)'}">${fmtShort(ds)}</span></th>`).join('');
+  const rows = combined.length ? combined.map(row=>{
+    if(row.type==='habit'){
+      const h = row.obj; const days = habitDays(h); const cur = calcHabitStreak(h.log||{});
+      const cells = weekDates.map((ds,i)=>{
+        if(!days[i]) return `<td><span class="tt-dash">–</span></td>`;
+        const checked = !!(h.log && h.log[ds]);
+        return `<td><div class="tt-checkbox ${checked?'checked':''} ${ds===today?'today':''}" data-tt-toggle="${h.id}" data-tt-date="${ds}">${checked?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div></td>`;
+      }).join('');
+      return `<tr><td><span class="time-text">${h.time||'—'}</span></td><td class="habit-col"><div class="habit-cell-name">${escapeHtml(h.name)}</div><div class="habit-cell-streak">streak ${cur}</div><span class="tag-pill habit">habit</span></td>${cells}<td><button class="icon-btn" data-del-habit="${h.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button></td></tr>`;
+    } else {
+      const t = row.obj;
+      const cells = weekDates.map(ds=>{ const scheduled = isTaskScheduledOn(t, ds); return scheduled ? `<td><div class="tt-checkbox" data-tt-task-toggle="${t.id}"></div></td>` : `<td><span class="tt-dash">–</span></td>`; }).join('');
+      const dl = dueLabel(t.dueDate);
+      return `<tr><td><span class="time-text">${t.time||'—'}</span></td><td class="habit-col"><div class="habit-cell-name">${escapeHtml(t.title)}</div><div class="habit-cell-streak">${dl.text}</div><span class="tag-pill task">task</span></td>${cells}<td><button class="icon-btn" data-del-task-tt="${t.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button></td></tr>`;
+    }
+  }).join('') : `<tr><td colspan="9" class="empty">Nothing scheduled — add a habit below! 🌈</td></tr>`;
+
+  const nowStr = new Date().toISOString();
+  const sortedEvents = S.events.slice().sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+  const eventItems = sortedEvents.length ? sortedEvents.map(ev=>{
+    const evDateTime = ev.date + 'T' + (ev.time || '00:00');
+    const isPast = evDateTime < nowStr.slice(0,16);
+    const d = new Date(ev.date+'T00:00:00');
+    return `<div class="event-item ${isPast?'past':''}">
+      <div class="event-datebox"><div class="d">${d.getDate()}</div><div class="m">${d.toLocaleString('en-US',{month:'short'})}</div></div>
+      <div class="event-body"><div class="event-title">${escapeHtml(ev.title)}</div><div class="event-time">${ev.time?ev.time:'all day'}</div></div>
+      <button class="bell-toggle ${ev.remind?'on':''}" data-toggle-remind="${ev.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3.5c0 .6-.2 1.2-.6 1.7L5 15h14l-1.4-2.8c-.4-.5-.6-1.1-.6-1.7V7a5 5 0 0 0-5-5Z" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke-linecap="round"/></svg></button>
+      <button class="icon-btn" data-del-event="${ev.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+    </div>`;
+  }).join('') : `<div class="empty">No events yet — add one below 🎈</div>`;
+
+  return `
+    <div class="card">
+      <div style="font-size:13px; color:var(--text-dim); margin-bottom:8px; font-weight:700;">Add a scheduled habit</div>
+      <div class="row" style="margin-bottom:8px;"><input type="text" id="new-habit-name" placeholder="e.g. Morning run..." style="flex:1; min-width:160px;"><input type="time" id="new-habit-time" style="width:110px;"></div>
+      <div class="row" id="new-habit-days" style="margin-bottom:8px;">${DAY_LABELS.map((lbl,i)=>`<button type="button" class="day-chip on" data-day-idx="${i}">${lbl}</button>`).join('')}</div>
+      <button class="btn" id="add-habit-btn">Add habit</button>
+    </div>
+    <div class="section-label">✨ weekly schedule</div>
+    <div class="card">
+      <div class="week-nav"><button data-week-nav="-1">‹ Prev</button><span class="week-nav-label">${fmtShort(monday)} – ${fmtShort(sunday)}${S.weekOffset===0?' (this week)':''}</span><button data-week-nav="1">Next ›</button></div>
+      <div class="table-scroll"><table class="timetable"><thead><tr><th>Time</th><th class="habit-col">What</th>${headerCells}<th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div class="section-label">🔔 events &amp; reminders</div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;"><input type="text" id="new-event-title" placeholder="Event name" style="flex:1; min-width:150px;"><input type="date" id="new-event-date" value="${today}"><input type="time" id="new-event-time"></div>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); margin-bottom:10px; font-weight:700;"><input type="checkbox" id="new-event-remind" style="width:16px; height:16px;"> Remind me</label>
+      <button class="btn" id="add-event-btn">Add event</button>
+    </div>
+    <div class="card" style="padding:4px 12px;">${eventItems}</div>
+    <div class="section-label">📊 consistency map</div>
+    <div class="card"><div class="big-heatmap">${renderCombinedHeatmap(14)}</div></div>`;
+}
+
+function renderCombinedHeatmap(weeks){
+  const dayCounts = {};
+  S.habits.forEach(h=> Object.keys(h.log||{}).forEach(d=>{ if(h.log[d]) dayCounts[d]=(dayCounts[d]||0)+1; }));
+  S.diary.forEach(e=>{ dayCounts[e.date]=(dayCounts[e.date]||0)+1; });
+  S.tasks.forEach(t=>{ if(t.done && t.completedAt){ const ds=t.completedAt.slice(0,10); dayCounts[ds]=(dayCounts[ds]||0)+1; } });
+  const cols=[]; const today = new Date(); const start = new Date(today);
+  start.setDate(start.getDate() - (weeks*7-1) - today.getDay());
+  for(let w=0; w<weeks; w++){
+    let col='';
+    for(let d=0; d<7; d++){ const cur=new Date(start); cur.setDate(cur.getDate()+w*7+d); const ds=fmtDate(cur); const inRange=cur<=today; const cnt=dayCounts[ds]||0; const lvl=cnt===0?0:cnt===1?1:cnt===2?2:3; col += `<div class="heat-cell" data-lvl="${inRange?lvl:''}" title="${ds}: ${cnt}"></div>`; }
+    cols.push(`<div class="heat-col">${col}</div>`);
+  }
+  return cols.join('');
+}
+
+function renderDiary(){
+  const entries = S.diary.slice().sort((a,b)=> b.date.localeCompare(a.date));
+  const items = entries.length ? entries.map(e=>`
+    <div class="diary-entry">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <div><div class="diary-date">${e.date}</div><div class="diary-title">${escapeHtml(e.title||'Untitled entry')}</div></div>
+        <button class="icon-btn" data-del-diary="${e.id}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+      </div>
+      ${e.text?`<div class="diary-text">${escapeHtml(e.text)}</div>`:''}
+    </div>`).join('') : `<div class="empty">No entries yet — jot down how today went 📔</div>`;
+  return `
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;"><input type="date" id="new-diary-date" value="${todayStr()}"><input type="text" id="new-diary-title" placeholder="Title (optional)" style="flex:1; min-width:140px;"></div>
+      <textarea id="new-diary-text" placeholder="What's on your mind today? 💭"></textarea>
+      <div style="margin-top:8px;"><button class="btn" id="add-diary-btn">Save entry</button></div>
+    </div>${items}`;
+}
+
+function renderInsights(){
+  const engagement = calcEngagementStreak(); const best = calcBestStreak();
+  const cutoff = fmtDate(addDays(todayStr(), -30));
+  const recentTasks = S.tasks.filter(t => (t.createdAt||'').slice(0,10) >= cutoff || (t.dueDate||'') >= cutoff);
+  const doneCount = recentTasks.filter(t=>t.done).length;
+  const taskRate = recentTasks.length ? Math.round(100*doneCount/recentTasks.length) : 0;
+  let habitChecks=0, habitPossible=0;
+  S.habits.forEach(h=>{ for(let i=0;i<30;i++){ const ds=fmtDate(addDays(todayStr(),-i)); habitPossible++; if(h.log && h.log[ds]) habitChecks++; } });
+  const habitRate = habitPossible ? Math.round(100*habitChecks/habitPossible) : 0;
+  const weekCounts = [];
+  for(let w=7; w>=0; w--){ let count=0; for(let d=0; d<7; d++){ const ds=fmtDate(addDays(todayStr(),-(w*7+d))); S.habits.forEach(h=>{ if(h.log&&h.log[ds]) count++; }); S.diary.forEach(e=>{ if(e.date===ds) count++; }); S.tasks.forEach(t=>{ if(t.done&&t.completedAt&&t.completedAt.slice(0,10)===ds) count++; }); } weekCounts.push(count); }
+  const maxWeek = Math.max(1, ...weekCounts);
+  const bars = weekCounts.map((c,i)=>`<div class="week-bar-wrap"><div class="week-bar" style="height:${Math.max(4,Math.round(90*c/maxWeek))}px;"></div><div class="week-bar-label">${i===7?'now':'-'+(7-i)+'w'}</div></div>`).join('');
+  return `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num">${engagement}</div><div class="stat-label">current streak (days)</div></div>
+      <div class="stat-box"><div class="stat-num green">${best}</div><div class="stat-label">best streak ever</div></div>
+      <div class="stat-box"><div class="stat-num">${taskRate}%</div><div class="stat-label">task completion (30d)</div><div class="bar-wrap"><div class="bar-fill" style="width:${taskRate}%; background:linear-gradient(90deg,var(--pink),var(--amber));"></div></div></div>
+      <div class="stat-box"><div class="stat-num green">${habitRate}%</div><div class="stat-label">habit consistency (30d)</div><div class="bar-wrap"><div class="bar-fill" style="width:${habitRate}%; background:linear-gradient(90deg,var(--green),var(--blue));"></div></div></div>
+    </div>
+    <div class="section-label">📈 weekly activity</div><div class="card"><div class="week-chart">${bars}</div></div>
+    <div class="section-label">🗓️ consistency map — last 14 weeks</div><div class="card"><div class="big-heatmap">${renderCombinedHeatmap(14)}</div></div>`;
+}
+
+// ---------- REMINDERS ----------
+function showBanner(text){
+  const zone = document.getElementById('banner-zone');
+  const div = document.createElement('div'); div.className = 'reminder-banner';
+  div.innerHTML = `<span>🔔 ${escapeHtml(text)}</span><button>×</button>`;
+  div.querySelector('button').onclick = ()=> div.remove();
+  zone.appendChild(div);
+  setTimeout(()=>{ if(div.parentNode) div.remove(); }, 20000);
+}
+async function checkReminders(){
+  if(!S.ready) return;
+  const now = new Date();
+  for(const ev of S.events){
+    if(!ev.remind || ev.notified) continue;
+    const evDate = new Date(ev.date+'T'+(ev.time||'00:00')+':00');
+    const diffMs = now - evDate;
+    if(diffMs >= 0 && diffMs < 10*60*1000){
+      showBanner(`"${ev.title}" is happening now (${ev.time||'today'})`);
+      try{ if('Notification' in window && Notification.permission==='granted'){ new Notification('Ledger reminder', {body:ev.title}); } }catch(e){}
+      ev.notified = true;
+      await supabaseClient.from('events').update({notified:true}).eq('id', ev.id);
+    }
+  }
+}
+setInterval(checkReminders, 20000);
+
+// ---------- HANDLERS ----------
+function attachHandlers(){
+  document.querySelectorAll('[data-toggle-task]').forEach(el=>{
+    el.onclick = async ()=>{
+      const t = S.tasks.find(x=>x.id===el.dataset.toggleTask);
+      const wasDone = t.done; t.done = !t.done; t.completedAt = t.done ? new Date().toISOString() : null;
+      await supabaseClient.from('tasks').update({done:t.done, completed_at:t.completedAt}).eq('id', t.id);
+      if(!wasDone && t.done) celebrate(pick(TASK_MSGS), true);
+      render(); checkMilestones();
+    };
+  });
+  document.querySelectorAll('[data-del-task]').forEach(el=>{ el.onclick = async ()=>{ await supabaseClient.from('tasks').delete().eq('id', el.dataset.delTask); S.tasks = S.tasks.filter(t=>t.id!==el.dataset.delTask); render(); }; });
+  const addTaskBtn = document.getElementById('add-task-btn');
+  if(addTaskBtn) addTaskBtn.onclick = async ()=>{
+    const title = document.getElementById('new-task-title').value.trim(); if(!title) return;
+    const priority = document.getElementById('new-task-priority').value;
+    const dueDate = document.getElementById('new-task-due').value;
+    const time = document.getElementById('new-task-time').value;
+    const { data } = await supabaseClient.from('tasks').insert([{ title, priority, time, due_date: dueDate||null }]).select();
+    if(data && data[0]) S.tasks.push(taskFromDb(data[0]));
+    render();
+  };
+  document.querySelectorAll('[data-filter]').forEach(el=>{ el.onclick = ()=>{ S.taskFilter = el.dataset.filter; render(); }; });
+
+  document.querySelectorAll('#new-habit-days [data-day-idx]').forEach(el=>{ el.onclick = ()=>{ el.classList.toggle('on'); }; });
+  const addHabitBtn = document.getElementById('add-habit-btn');
+  if(addHabitBtn) addHabitBtn.onclick = async ()=>{
+    const name = document.getElementById('new-habit-name').value.trim(); if(!name) return;
+    const time = document.getElementById('new-habit-time').value;
+    const days = Array.from(document.querySelectorAll('#new-habit-days [data-day-idx]')).map(el=>el.classList.contains('on'));
+    const { data } = await supabaseClient.from('habits').insert([{ name, time, days, log:{} }]).select();
+    if(data && data[0]) S.habits.push(habitFromDb(data[0]));
+    render();
+  };
+  document.querySelectorAll('[data-tt-toggle]').forEach(el=>{
+    el.onclick = async ()=>{
+      const h = S.habits.find(x=>x.id===el.dataset.ttToggle); const ds = el.dataset.ttDate;
+      h.log = h.log || {}; const turningOn = !h.log[ds];
+      if(h.log[ds]) delete h.log[ds]; else h.log[ds] = true;
+      await supabaseClient.from('habits').update({log:h.log}).eq('id', h.id);
+      if(turningOn) celebrate(pick(HABIT_MSGS), false);
+      render(); checkMilestones();
+    };
+  });
+  document.querySelectorAll('[data-tt-task-toggle]').forEach(el=>{
+    el.onclick = async ()=>{
+      const t = S.tasks.find(x=>x.id===el.dataset.ttTaskToggle);
+      t.done = true; t.completedAt = new Date().toISOString();
+      await supabaseClient.from('tasks').update({done:true, completed_at:t.completedAt}).eq('id', t.id);
+      celebrate(pick(TASK_MSGS), true);
+      render(); checkMilestones();
+    };
+  });
+  document.querySelectorAll('[data-del-habit]').forEach(el=>{ el.onclick = async ()=>{ await supabaseClient.from('habits').delete().eq('id', el.dataset.delHabit); S.habits = S.habits.filter(h=>h.id!==el.dataset.delHabit); render(); }; });
+  document.querySelectorAll('[data-del-task-tt]').forEach(el=>{ el.onclick = async ()=>{ await supabaseClient.from('tasks').delete().eq('id', el.dataset.delTaskTt); S.tasks = S.tasks.filter(t=>t.id!==el.dataset.delTaskTt); render(); }; });
+  document.querySelectorAll('[data-week-nav]').forEach(el=>{ el.onclick = ()=>{ S.weekOffset += parseInt(el.dataset.weekNav,10); render(); }; });
+
+  const addEventBtn = document.getElementById('add-event-btn');
+  if(addEventBtn) addEventBtn.onclick = async ()=>{
+    const title = document.getElementById('new-event-title').value.trim(); if(!title) return;
+    const date = document.getElementById('new-event-date').value || todayStr();
+    const time = document.getElementById('new-event-time').value;
+    const remind = document.getElementById('new-event-remind').checked;
+    if(remind){ try{ if('Notification' in window && Notification.permission==='default') Notification.requestPermission(); }catch(e){} }
+    const { data } = await supabaseClient.from('events').insert([{ title, date, time, remind, notified:false }]).select();
+    if(data && data[0]) S.events.push(eventFromDb(data[0]));
+    render();
+  };
+  document.querySelectorAll('[data-toggle-remind]').forEach(el=>{
+    el.onclick = async ()=>{
+      const ev = S.events.find(x=>x.id===el.dataset.toggleRemind);
+      ev.remind = !ev.remind; if(ev.remind) ev.notified = false;
+      await supabaseClient.from('events').update({remind:ev.remind, notified:ev.notified}).eq('id', ev.id);
+      render();
+    };
+  });
+  document.querySelectorAll('[data-del-event]').forEach(el=>{ el.onclick = async ()=>{ await supabaseClient.from('events').delete().eq('id', el.dataset.delEvent); S.events = S.events.filter(e=>e.id!==el.dataset.delEvent); render(); }; });
+
+  document.querySelectorAll('[data-del-diary]').forEach(el=>{ el.onclick = async ()=>{ await supabaseClient.from('diary_entries').delete().eq('id', el.dataset.delDiary); S.diary = S.diary.filter(e=>e.id!==el.dataset.delDiary); render(); }; });
+  const addDiaryBtn = document.getElementById('add-diary-btn');
+  if(addDiaryBtn) addDiaryBtn.onclick = async ()=>{
+    const date = document.getElementById('new-diary-date').value || todayStr();
+    const title = document.getElementById('new-diary-title').value.trim();
+    const text = document.getElementById('new-diary-text').value.trim();
+    if(!title && !text) return;
+    const { data } = await supabaseClient.from('diary_entries').insert([{ date, title, body:text }]).select();
+    if(data && data[0]) S.diary.push(diaryFromDb(data[0]));
+    render();
+  };
+}
+
+document.querySelectorAll('.tab').forEach(t=>{ t.onclick = ()=>{ S.tab = t.dataset.tab; render(); }; });
+
+initAuth();
+})();
+</script>
+</body>
+</html>
