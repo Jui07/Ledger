@@ -36,8 +36,8 @@ Because Ledger runs as a zero-build client-side app, setting it up takes under t
 
 1.  **Clone the Repository:**
     ```bash
-    git clone [https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git)
-    cd YOUR_REPO_NAME
+    git clone https://github.com/Jui07/Ledger.git
+    cd Ledger
     ```
 
 2.  **Configure Your Backend:**
